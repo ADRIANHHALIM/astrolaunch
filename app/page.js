@@ -36,7 +36,7 @@ import {
   Trash2,
   LogOut
 } from 'lucide-react'
-import { useToast } from '@/components/ui/use-toast'
+import { useToast } from '@/hooks/use-toast'
 import RocketModel from '@/components/rocket-model'
 import Navigation from '@/components/navigation'
 import AuthDialog from '@/components/auth-dialog'
