@@ -14,7 +14,8 @@ import {
   Satellite,
   Users,
   Calendar,
-  Mail
+  Mail,
+  Shield
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -36,6 +37,11 @@ export default function Navigation({ activeSection, setActiveSection, user, logo
     { id: 'contact', label: 'Contact', icon: Mail },
   ]
 
+  // Add admin tab only for admin users
+  const allNavItems = user && user.role === 'admin' 
+    ? [...navItems, { id: 'admin', label: 'Admin', icon: Shield }]
+    : navItems
+
   return (
     <>
       {/* Desktop Navigation */}
@@ -54,7 +60,7 @@ export default function Navigation({ activeSection, setActiveSection, user, logo
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center space-x-8">
-              {navItems.map((item) => {
+              {allNavItems.map((item) => {
                 const Icon = item.icon
                 return (
                   <button
@@ -130,7 +136,7 @@ export default function Navigation({ activeSection, setActiveSection, user, logo
           className="fixed inset-0 z-40 bg-black/95 backdrop-blur-md md:hidden"
         >
           <div className="flex flex-col items-center justify-center h-full space-y-8">
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const Icon = item.icon
               return (
                 <button

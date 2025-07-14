@@ -52,25 +52,37 @@ export default function App() {
   const [nextLaunch, setNextLaunch] = useState(null)
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
   const [isLoading, setIsLoading] = useState(true)
+  
+  // Form states
+  const [showAddRocketDialog, setShowAddRocketDialog] = useState(false)
+  const [showAddMissionDialog, setShowAddMissionDialog] = useState(false)
+  const [showAddTeamDialog, setShowAddTeamDialog] = useState(false)
+  const [showAddScheduleDialog, setShowAddScheduleDialog] = useState(false)
+  
   const { toast } = useToast()
 
   // Authentication functions
   const login = async (email, password) => {
+    console.log('Login function called with:', { email, password })
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       })
+      console.log('Response received:', response.status, response.ok)
       const data = await response.json()
+      console.log('Response data:', data)
       if (response.ok) {
         setUser(data.user)
         localStorage.setItem('token', data.token)
         toast({ title: 'Welcome back!', description: 'Successfully logged in.' })
+        console.log('User set:', data.user)
       } else {
         toast({ title: 'Error', description: data.error, variant: 'destructive' })
       }
     } catch (error) {
+      console.error('Login fetch error:', error)
       toast({ title: 'Error', description: 'Login failed', variant: 'destructive' })
     }
   }
@@ -113,6 +125,11 @@ export default function App() {
         fetch('/api/schedules')
       ])
       
+      // Check if requests were successful
+      if (!rocketsRes.ok || !missionsRes.ok || !teamsRes.ok || !schedulesRes.ok) {
+        throw new Error('Failed to fetch data from one or more endpoints')
+      }
+      
       const [rocketsData, missionsData, teamsData, schedulesData] = await Promise.all([
         rocketsRes.json(),
         missionsRes.json(),
@@ -120,14 +137,16 @@ export default function App() {
         schedulesRes.json()
       ])
       
-      setRockets(rocketsData)
-      setMissions(missionsData)
-      setTeams(teamsData)
-      setSchedules(schedulesData)
+      // Ensure data is arrays, fallback to empty arrays if not
+      setRockets(Array.isArray(rocketsData) ? rocketsData : [])
+      setMissions(Array.isArray(missionsData) ? missionsData : [])
+      setTeams(Array.isArray(teamsData) ? teamsData : [])
+      setSchedules(Array.isArray(schedulesData) ? schedulesData : [])
       
       // Find next launch
       const now = new Date()
-      const upcomingLaunches = schedulesData.filter(schedule => new Date(schedule.launchDate) > now)
+      const validSchedules = Array.isArray(schedulesData) ? schedulesData : []
+      const upcomingLaunches = validSchedules.filter(schedule => new Date(schedule.launchDate) > now)
       if (upcomingLaunches.length > 0) {
         const nextLaunchSchedule = upcomingLaunches.sort((a, b) => 
           new Date(a.launchDate) - new Date(b.launchDate)
@@ -138,6 +157,160 @@ export default function App() {
       console.error('Error fetching data:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Functions to add new items
+  const addRocket = async (rocketData) => {
+    if (!user || user.role !== 'admin') {
+      toast({ 
+        title: 'Access Denied', 
+        description: 'Admin privileges required to add rockets', 
+        variant: 'destructive' 
+      })
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/rockets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(rocketData)
+      })
+
+      if (response.ok) {
+        const newRocket = await response.json()
+        setRockets(prev => [newRocket, ...prev])
+        setShowAddRocketDialog(false)
+        toast({ title: 'Success', description: 'Rocket added successfully!' })
+      } else {
+        const error = await response.json()
+        toast({ title: 'Error', description: error.error || 'Failed to add rocket', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to add rocket', variant: 'destructive' })
+    }
+  }
+
+  const addMission = async (missionData) => {
+    if (!user || user.role !== 'admin') {
+      toast({ 
+        title: 'Access Denied', 
+        description: 'Admin privileges required to add missions', 
+        variant: 'destructive' 
+      })
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/missions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(missionData)
+      })
+
+      if (response.ok) {
+        const newMission = await response.json()
+        setMissions(prev => [newMission, ...prev])
+        setShowAddMissionDialog(false)
+        toast({ title: 'Success', description: 'Mission added successfully!' })
+      } else {
+        const error = await response.json()
+        toast({ title: 'Error', description: error.error || 'Failed to add mission', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to add mission', variant: 'destructive' })
+    }
+  }
+
+  const addTeamMember = async (teamData) => {
+    if (!user || user.role !== 'admin') {
+      toast({ 
+        title: 'Access Denied', 
+        description: 'Admin privileges required to add team members', 
+        variant: 'destructive' 
+      })
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/teams', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(teamData)
+      })
+
+      if (response.ok) {
+        const newTeamMember = await response.json()
+        setTeams(prev => [newTeamMember, ...prev])
+        setShowAddTeamDialog(false)
+        toast({ title: 'Success', description: 'Team member added successfully!' })
+      } else {
+        const error = await response.json()
+        toast({ title: 'Error', description: error.error || 'Failed to add team member', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to add team member', variant: 'destructive' })
+    }
+  }
+
+  const addSchedule = async (scheduleData) => {
+    if (!user || user.role !== 'admin') {
+      toast({ 
+        title: 'Access Denied', 
+        description: 'Admin privileges required to add schedules', 
+        variant: 'destructive' 
+      })
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/schedules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(scheduleData)
+      })
+
+      if (response.ok) {
+        const newSchedule = await response.json()
+        setSchedules(prev => [newSchedule, ...prev])
+        setShowAddScheduleDialog(false)
+        toast({ title: 'Success', description: 'Schedule added successfully!' })
+        
+        // Update next launch if this is the earliest upcoming launch
+        const now = new Date()
+        if (new Date(scheduleData.launchDate) > now) {
+          const allSchedules = [newSchedule, ...schedules]
+          const upcomingLaunches = allSchedules.filter(schedule => new Date(schedule.launchDate) > now)
+          if (upcomingLaunches.length > 0) {
+            const nextLaunchSchedule = upcomingLaunches.sort((a, b) => 
+              new Date(a.launchDate) - new Date(b.launchDate)
+            )[0]
+            setNextLaunch(nextLaunchSchedule)
+          }
+        }
+      } else {
+        const error = await response.json()
+        toast({ title: 'Error', description: error.error || 'Failed to add schedule', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to add schedule', variant: 'destructive' })
     }
   }
 
@@ -295,7 +468,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center text-white mb-16">Recent Missions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {missions.slice(0, 3).map((mission, index) => (
+            {(missions || []).slice(0, 3).map((mission, index) => (
               <Card key={mission.id} className="bg-gray-800 border-gray-700">
                 <CardHeader>
                   <div className="flex justify-between items-start">
@@ -331,7 +504,7 @@ export default function App() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold text-white mb-8">Our Rockets</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {rockets.map((rocket) => (
+          {(rockets || []).map((rocket) => (
             <Card key={rocket.id} className="bg-gray-800 border-gray-700">
               <CardHeader>
                 <CardTitle className="text-white">{rocket.name}</CardTitle>
@@ -395,7 +568,7 @@ export default function App() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold text-white mb-8">Our Missions</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {missions.map((mission) => (
+          {(missions || []).map((mission) => (
             <Card key={mission.id} className="bg-gray-800 border-gray-700">
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -440,7 +613,7 @@ export default function App() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold text-white mb-8">Our Team</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {teams.map((member) => (
+          {(teams || []).map((member) => (
             <Card key={member.id} className="bg-gray-800 border-gray-700">
               <CardHeader>
                 <CardTitle className="text-white">{member.name}</CardTitle>
@@ -473,7 +646,7 @@ export default function App() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-bold text-white mb-8">Launch Schedule</h1>
         <div className="space-y-6">
-          {schedules.map((schedule) => (
+          {(schedules || []).map((schedule) => (
             <Card key={schedule.id} className="bg-gray-800 border-gray-700">
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -582,128 +755,640 @@ export default function App() {
     </div>
   )
 
-  const renderAdminPage = () => (
-    <div className="min-h-screen pt-20 px-4 bg-black">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-4xl font-bold text-white mb-8">Admin Dashboard</h1>
-        <Tabs defaultValue="rockets" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="rockets">Rockets</TabsTrigger>
-            <TabsTrigger value="missions">Missions</TabsTrigger>
-            <TabsTrigger value="teams">Teams</TabsTrigger>
-            <TabsTrigger value="schedules">Schedules</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="rockets" className="mt-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Manage Rockets</h2>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="h-4 w-4 mr-2" />
+  // Add Rocket Form Component
+  const AddRocketForm = () => {
+    const [formData, setFormData] = useState({
+      name: '',
+      type: '',
+      specifications: {
+        height: '',
+        diameter: '',
+        mass: '',
+        payloadToLEO: ''
+      },
+      status: 'development'
+    })
+
+    const handleSubmit = (e) => {
+      e.preventDefault()
+      if (!formData.name || !formData.type || !formData.specifications.height) {
+        toast({ title: 'Error', description: 'Please fill in all required fields', variant: 'destructive' })
+        return
+      }
+      addRocket(formData)
+    }
+
+    return (
+      <Dialog open={showAddRocketDialog} onOpenChange={setShowAddRocketDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Rocket</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="rocketName">Rocket Name *</Label>
+                <Input
+                  id="rocketName"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  placeholder="e.g., Falcon Heavy"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="rocketType">Type *</Label>
+                <Input
+                  id="rocketType"
+                  value={formData.type}
+                  onChange={(e) => setFormData({...formData, type: e.target.value})}
+                  placeholder="e.g., Heavy-lift launch vehicle"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="height">Height *</Label>
+                <Input
+                  id="height"
+                  value={formData.specifications.height}
+                  onChange={(e) => setFormData({
+                    ...formData, 
+                    specifications: {...formData.specifications, height: e.target.value}
+                  })}
+                  placeholder="e.g., 70 m"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="diameter">Diameter</Label>
+                <Input
+                  id="diameter"
+                  value={formData.specifications.diameter}
+                  onChange={(e) => setFormData({
+                    ...formData, 
+                    specifications: {...formData.specifications, diameter: e.target.value}
+                  })}
+                  placeholder="e.g., 12.2 m"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="mass">Mass</Label>
+                <Input
+                  id="mass"
+                  value={formData.specifications.mass}
+                  onChange={(e) => setFormData({
+                    ...formData, 
+                    specifications: {...formData.specifications, mass: e.target.value}
+                  })}
+                  placeholder="e.g., 1,420,788 kg"
+                />
+              </div>
+              <div>
+                <Label htmlFor="payloadToLEO">Payload to LEO</Label>
+                <Input
+                  id="payloadToLEO"
+                  value={formData.specifications.payloadToLEO}
+                  onChange={(e) => setFormData({
+                    ...formData, 
+                    specifications: {...formData.specifications, payloadToLEO: e.target.value}
+                  })}
+                  placeholder="e.g., 63,800 kg"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <select
+                id="status"
+                value={formData.status}
+                onChange={(e) => setFormData({...formData, status: e.target.value})}
+                className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+              >
+                <option value="development">Development</option>
+                <option value="active">Active</option>
+                <option value="retired">Retired</option>
+              </select>
+            </div>
+            
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowAddRocketDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
                 Add Rocket
               </Button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {rockets.map((rocket) => (
-                <Card key={rocket.id} className="bg-gray-800 border-gray-700">
-                  <CardHeader>
-                    <CardTitle className="text-white">{rocket.name}</CardTitle>
-                    <CardDescription className="text-gray-400">{rocket.type}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-end space-x-2">
-                      <Button size="sm" variant="outline">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          </form>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // Add Mission Form Component
+  const AddMissionForm = () => {
+    const [formData, setFormData] = useState({
+      name: '',
+      description: '',
+      status: 'planned',
+      launchDate: '',
+      payload: '',
+      orbit: '',
+      customer: ''
+    })
+
+    const handleSubmit = (e) => {
+      e.preventDefault()
+      if (!formData.name || !formData.description || !formData.launchDate) {
+        toast({ title: 'Error', description: 'Please fill in all required fields', variant: 'destructive' })
+        return
+      }
+      
+      const missionData = {
+        ...formData,
+        launchDate: new Date(formData.launchDate)
+      }
+      addMission(missionData)
+    }
+
+    return (
+      <Dialog open={showAddMissionDialog} onOpenChange={setShowAddMissionDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Mission</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="missionName">Mission Name *</Label>
+              <Input
+                id="missionName"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                placeholder="e.g., Artemis Moon Mission"
+                required
+              />
             </div>
-          </TabsContent>
-          
-          <TabsContent value="missions" className="mt-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Manage Missions</h2>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="h-4 w-4 mr-2" />
+            
+            <div>
+              <Label htmlFor="description">Description *</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                placeholder="e.g., Return humans to the Moon and establish a sustainable lunar presence"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="launchDate">Launch Date *</Label>
+                <Input
+                  id="launchDate"
+                  type="date"
+                  value={formData.launchDate}
+                  onChange={(e) => setFormData({...formData, launchDate: e.target.value})}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="missionStatus">Status</Label>
+                <select
+                  id="missionStatus"
+                  value={formData.status}
+                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                  className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+                >
+                  <option value="planned">Planned</option>
+                  <option value="success">Success</option>
+                  <option value="failed">Failed</option>
+                  <option value="in-progress">In Progress</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="payload">Payload</Label>
+                <Input
+                  id="payload"
+                  value={formData.payload}
+                  onChange={(e) => setFormData({...formData, payload: e.target.value})}
+                  placeholder="e.g., Orion Spacecraft"
+                />
+              </div>
+              <div>
+                <Label htmlFor="orbit">Orbit</Label>
+                <Input
+                  id="orbit"
+                  value={formData.orbit}
+                  onChange={(e) => setFormData({...formData, orbit: e.target.value})}
+                  placeholder="e.g., Lunar orbit"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="customer">Customer</Label>
+              <Input
+                id="customer"
+                value={formData.customer}
+                onChange={(e) => setFormData({...formData, customer: e.target.value})}
+                placeholder="e.g., NASA"
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowAddMissionDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
                 Add Mission
               </Button>
             </div>
-            <div className="space-y-4">
-              {missions.map((mission) => (
-                <Card key={mission.id} className="bg-gray-800 border-gray-700">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-white">{mission.name}</CardTitle>
-                        <CardDescription className="text-gray-400">{mission.description}</CardDescription>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button size="sm" variant="outline">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
+          </form>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // Add Team Member Form Component
+  const AddTeamForm = () => {
+    const [formData, setFormData] = useState({
+      name: '',
+      position: '',
+      department: '',
+      bio: '',
+      experience: ''
+    })
+
+    const handleSubmit = (e) => {
+      e.preventDefault()
+      if (!formData.name || !formData.position || !formData.department) {
+        toast({ title: 'Error', description: 'Please fill in all required fields', variant: 'destructive' })
+        return
+      }
+      addTeamMember(formData)
+    }
+
+    return (
+      <Dialog open={showAddTeamDialog} onOpenChange={setShowAddTeamDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Team Member</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="memberName">Name *</Label>
+                <Input
+                  id="memberName"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  placeholder="e.g., Dr. Sarah Chen"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="position">Position *</Label>
+                <Input
+                  id="position"
+                  value={formData.position}
+                  onChange={(e) => setFormData({...formData, position: e.target.value})}
+                  placeholder="e.g., Chief Technology Officer"
+                  required
+                />
+              </div>
             </div>
-          </TabsContent>
-          
-          <TabsContent value="teams" className="mt-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Manage Team</h2>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Member
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="department">Department *</Label>
+                <select
+                  id="department"
+                  value={formData.department}
+                  onChange={(e) => setFormData({...formData, department: e.target.value})}
+                  className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+                  required
+                >
+                  <option value="">Select Department</option>
+                  <option value="Engineering">Engineering</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Research">Research</option>
+                  <option value="Management">Management</option>
+                  <option value="Safety">Safety</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="experience">Experience</Label>
+                <Input
+                  id="experience"
+                  value={formData.experience}
+                  onChange={(e) => setFormData({...formData, experience: e.target.value})}
+                  placeholder="e.g., 15 years"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                value={formData.bio}
+                onChange={(e) => setFormData({...formData, bio: e.target.value})}
+                placeholder="Brief biography and expertise..."
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowAddTeamDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                Add Team Member
               </Button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {teams.map((member) => (
-                <Card key={member.id} className="bg-gray-800 border-gray-700">
-                  <CardHeader>
-                    <CardTitle className="text-white">{member.name}</CardTitle>
-                    <CardDescription className="text-gray-400">{member.position}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-end space-x-2">
-                      <Button size="sm" variant="outline">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          </form>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // Add Schedule Form Component
+  const AddScheduleForm = () => {
+    const [formData, setFormData] = useState({
+      missionName: '',
+      description: '',
+      launchDate: '',
+      launchTime: '',
+      rocket: '',
+      launchSite: '',
+      customer: '',
+      payload: '',
+      status: 'scheduled'
+    })
+
+    const handleSubmit = (e) => {
+      e.preventDefault()
+      if (!formData.missionName || !formData.description || !formData.launchDate) {
+        toast({ title: 'Error', description: 'Please fill in all required fields', variant: 'destructive' })
+        return
+      }
+      
+      const scheduleData = {
+        ...formData,
+        launchDate: new Date(formData.launchDate)
+      }
+      addSchedule(scheduleData)
+    }
+
+    return (
+      <Dialog open={showAddScheduleDialog} onOpenChange={setShowAddScheduleDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Launch Schedule</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="scheduleMissionName">Mission Name *</Label>
+              <Input
+                id="scheduleMissionName"
+                value={formData.missionName}
+                onChange={(e) => setFormData({...formData, missionName: e.target.value})}
+                placeholder="e.g., Jupiter Probe Launch"
+                required
+              />
             </div>
-          </TabsContent>
-          
-          <TabsContent value="schedules" className="mt-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Manage Schedules</h2>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="h-4 w-4 mr-2" />
+            
+            <div>
+              <Label htmlFor="scheduleDescription">Description *</Label>
+              <Textarea
+                id="scheduleDescription"
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                placeholder="e.g., Scientific mission to study Jupiter and its moons"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="scheduleLaunchDate">Launch Date *</Label>
+                <Input
+                  id="scheduleLaunchDate"
+                  type="date"
+                  value={formData.launchDate}
+                  onChange={(e) => setFormData({...formData, launchDate: e.target.value})}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="launchTime">Launch Time</Label>
+                <Input
+                  id="launchTime"
+                  value={formData.launchTime}
+                  onChange={(e) => setFormData({...formData, launchTime: e.target.value})}
+                  placeholder="e.g., 14:30 UTC"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="scheduleRocket">Rocket</Label>
+                <Input
+                  id="scheduleRocket"
+                  value={formData.rocket}
+                  onChange={(e) => setFormData({...formData, rocket: e.target.value})}
+                  placeholder="e.g., Falcon Heavy"
+                />
+              </div>
+              <div>
+                <Label htmlFor="launchSite">Launch Site</Label>
+                <Input
+                  id="launchSite"
+                  value={formData.launchSite}
+                  onChange={(e) => setFormData({...formData, launchSite: e.target.value})}
+                  placeholder="e.g., Kennedy Space Center"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="scheduleCustomer">Customer</Label>
+                <Input
+                  id="scheduleCustomer"
+                  value={formData.customer}
+                  onChange={(e) => setFormData({...formData, customer: e.target.value})}
+                  placeholder="e.g., NASA"
+                />
+              </div>
+              <div>
+                <Label htmlFor="schedulePayload">Payload</Label>
+                <Input
+                  id="schedulePayload"
+                  value={formData.payload}
+                  onChange={(e) => setFormData({...formData, payload: e.target.value})}
+                  placeholder="e.g., Jupiter Probe"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="scheduleStatus">Status</Label>
+              <select
+                id="scheduleStatus"
+                value={formData.status}
+                onChange={(e) => setFormData({...formData, status: e.target.value})}
+                className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+              >
+                <option value="scheduled">Scheduled</option>
+                <option value="completed">Completed</option>
+                <option value="delayed">Delayed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowAddScheduleDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
                 Add Schedule
               </Button>
             </div>
-            <div className="space-y-4">
-              {schedules.map((schedule) => (
-                <Card key={schedule.id} className="bg-gray-800 border-gray-700">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-white">{schedule.missionName}</CardTitle>
-                        <CardDescription className="text-gray-400">{schedule.description}</CardDescription>
+          </form>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  const renderAdminPage = () => {
+    // Check if user is logged in and is admin
+    if (!user) {
+      return (
+        <div className="min-h-screen pt-20 px-4 bg-black">
+          <div className="max-w-6xl mx-auto text-center">
+            <h1 className="text-4xl font-bold text-white mb-8">Admin Dashboard</h1>
+            <Card className="bg-gray-800 border-gray-700 max-w-md mx-auto">
+              <CardHeader>
+                <CardTitle className="text-white">Admin Access Required</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Please log in with admin credentials to access the admin dashboard.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 text-gray-300 text-sm">
+                  <p className="mb-2">Use these admin credentials:</p>
+                  <div className="bg-gray-900 p-3 rounded font-mono text-xs">
+                    <p>Email: <span className="text-blue-400">admin@astrolaunch.com</span></p>
+                    <p>Password: <span className="text-blue-400">admin123</span></p>
+                  </div>
+                </div>
+                <AuthDialog login={login} register={register} />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )
+    }
+
+    if (user.role !== 'admin') {
+      return (
+        <div className="min-h-screen pt-20 px-4 bg-black">
+          <div className="max-w-6xl mx-auto text-center">
+            <h1 className="text-4xl font-bold text-white mb-8">Access Denied</h1>
+            <Card className="bg-gray-800 border-gray-700 max-w-md mx-auto">
+              <CardHeader>
+                <CardTitle className="text-white">Admin Privileges Required</CardTitle>
+                <CardDescription className="text-gray-400">
+                  You need admin privileges to access this page.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-300 mb-4">
+                  Current user: <span className="text-blue-400">{user.name}</span>
+                </p>
+                <p className="text-gray-300 mb-4">
+                  Role: <span className="text-yellow-400">{user.role}</span>
+                </p>
+                <Button 
+                  onClick={() => setActiveSection('home')}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                >
+                  Return to Home
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="min-h-screen pt-20 px-4 bg-black">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
+            <div className="text-white">
+              Welcome, <span className="text-blue-400">{user.name}</span>
+              <span className="ml-2 px-2 py-1 bg-green-600 text-xs rounded">
+                {user.role.toUpperCase()}
+              </span>
+            </div>
+          </div>
+          
+          <Tabs defaultValue="rockets" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="rockets">Rockets</TabsTrigger>
+              <TabsTrigger value="missions">Missions</TabsTrigger>
+              <TabsTrigger value="teams">Teams</TabsTrigger>
+              <TabsTrigger value="schedules">Schedules</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="rockets" className="mt-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-white">Manage Rockets</h2>
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => setShowAddRocketDialog(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Rocket
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(rockets || []).map((rocket) => (
+                  <Card key={rocket.id} className="bg-gray-800 border-gray-700">
+                    <CardHeader>
+                      <CardTitle className="text-white">{rocket.name}</CardTitle>
+                      <CardDescription className="text-gray-400">{rocket.type}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm text-gray-300 mb-4">
+                        <div className="flex justify-between">
+                          <span>Status:</span>
+                          <Badge variant={rocket.status === 'active' ? 'default' : 'secondary'}>
+                            {rocket.status}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Height:</span>
+                          <span>{rocket.specifications?.height || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Payload:</span>
+                          <span>{rocket.specifications?.payloadToLEO || 'N/A'}</span>
+                        </div>
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex justify-end space-x-2">
                         <Button size="sm" variant="outline">
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -711,16 +1396,198 @@ export default function App() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="missions" className="mt-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-white">Manage Missions</h2>
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => setShowAddMissionDialog(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Mission
+                </Button>
+              </div>
+              <div className="space-y-4">
+                {(missions || []).map((mission) => (
+                  <Card key={mission.id} className="bg-gray-800 border-gray-700">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-white">{mission.name}</CardTitle>
+                          <CardDescription className="text-gray-400">{mission.description}</CardDescription>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={mission.status === 'success' ? 'default' : 'secondary'}>
+                            {mission.status}
+                          </Badge>
+                          <div className="flex space-x-2">
+                            <Button size="sm" variant="outline">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="outline">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-300">
+                        <div className="flex justify-between">
+                          <span>Launch Date:</span>
+                          <span>{new Date(mission.launchDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Customer:</span>
+                          <span>{mission.customer || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Payload:</span>
+                          <span>{mission.payload || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Orbit:</span>
+                          <span>{mission.orbit || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="teams" className="mt-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-white">Manage Team</h2>
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => setShowAddTeamDialog(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Member
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(teams || []).map((member) => (
+                  <Card key={member.id} className="bg-gray-800 border-gray-700">
+                    <CardHeader>
+                      <CardTitle className="text-white">{member.name}</CardTitle>
+                      <CardDescription className="text-gray-400">{member.position}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm text-gray-300 mb-4">
+                        <div className="flex justify-between">
+                          <span>Department:</span>
+                          <span>{member.department}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Experience:</span>
+                          <span>{member.experience || 'N/A'}</span>
+                        </div>
+                        {member.bio && (
+                          <p className="text-xs text-gray-400 mt-2 line-clamp-3">
+                            {member.bio}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button size="sm" variant="outline">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="outline">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="schedules" className="mt-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-white">Manage Schedules</h2>
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => setShowAddScheduleDialog(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Schedule
+                </Button>
+              </div>
+              <div className="space-y-4">
+                {(schedules || []).map((schedule) => (
+                  <Card key={schedule.id} className="bg-gray-800 border-gray-700">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-white">{schedule.missionName}</CardTitle>
+                          <CardDescription className="text-gray-400">{schedule.description}</CardDescription>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={schedule.status === 'scheduled' ? 'default' : 'secondary'}>
+                            {schedule.status}
+                          </Badge>
+                          <div className="flex space-x-2">
+                            <Button size="sm" variant="outline">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="outline">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-300">
+                        <div className="flex justify-between">
+                          <span>Launch Date:</span>
+                          <span>{new Date(schedule.launchDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Launch Time:</span>
+                          <span>{schedule.launchTime || 'TBD'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Rocket:</span>
+                          <span>{schedule.rocket || 'TBD'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Launch Site:</span>
+                          <span>{schedule.launchSite || 'TBD'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Customer:</span>
+                          <span>{schedule.customer || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Payload:</span>
+                          <span>{schedule.payload || 'TBD'}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          {/* Add Form Dialogs */}
+          <AddRocketForm />
+          <AddMissionForm />
+          <AddTeamForm />
+          <AddScheduleForm />
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   const renderCurrentPage = () => {
     switch (activeSection) {

@@ -12,20 +12,42 @@ export default function AuthDialog({ login, register }) {
   const [isOpen, setIsOpen] = useState(false)
   const [loginData, setLoginData] = useState({ email: '', password: '' })
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' })
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleLogin = async (e) => {
     e.preventDefault()
+    console.log('Login button clicked!', { email: loginData.email, password: loginData.password })
     if (login) {
-      await login(loginData.email, loginData.password)
-      setIsOpen(false)
+      setIsLoading(true)
+      try {
+        console.log('Calling login function...')
+        await login(loginData.email, loginData.password)
+        console.log('Login successful!')
+        setIsOpen(false)
+        setLoginData({ email: '', password: '' })
+      } catch (error) {
+        console.error('Login error:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    } else {
+      console.error('Login function not provided!')
     }
   }
 
   const handleRegister = async (e) => {
     e.preventDefault()
     if (register) {
-      await register(registerData.email, registerData.password, registerData.name)
-      setIsOpen(false)
+      setIsLoading(true)
+      try {
+        await register(registerData.email, registerData.password, registerData.name)
+        setIsOpen(false)
+        setRegisterData({ name: '', email: '', password: '' })
+      } catch (error) {
+        console.error('Register error:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -79,9 +101,9 @@ export default function AuthDialog({ login, register }) {
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
                 <User className="h-4 w-4 mr-2" />
-                Login
+                {isLoading ? 'Logging in...' : 'Login'}
               </Button>
             </form>
           </TabsContent>

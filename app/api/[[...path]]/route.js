@@ -1,20 +1,15 @@
-import { MongoClient } from 'mongodb'
 import { v4 as uuidv4 } from 'uuid'
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
-// MongoDB connection
-let client
-let db
-
-async function connectToMongo() {
-  if (!client) {
-    client = new MongoClient(process.env.MONGO_URL)
-    await client.connect()
-    db = client.db(process.env.DB_NAME)
-  }
-  return db
+// In-memory storage (for development)
+let inMemoryDB = {
+  users: [],
+  rockets: [],
+  missions: [],
+  teams: [],
+  schedules: []
 }
 
 // JWT secret
@@ -46,194 +41,172 @@ function verifyToken(request) {
 
 // Initialize sample data
 async function initializeSampleData() {
-  const db = await connectToMongo()
+  // Create admin user if it doesn't exist
+  const adminEmail = 'admin@astrolaunch.com'
+  const existingAdmin = inMemoryDB.users.find(user => user.email === adminEmail)
   
-  // Sample rockets
-  const rockets = [
-    {
+  if (!existingAdmin) {
+    const hashedPassword = await bcrypt.hash('admin123', 10)
+    const adminUser = {
       id: uuidv4(),
-      name: 'Falcon Heavy',
-      type: 'Heavy-lift launch vehicle',
-      specifications: {
-        height: '70 m',
-        diameter: '12.2 m',
-        mass: '1,420,788 kg',
-        payloadToLEO: '63,800 kg'
-      },
-      status: 'active',
-      createdAt: new Date()
-    },
-    {
-      id: uuidv4(),
-      name: 'Starship',
-      type: 'Super heavy-lift launch vehicle',
-      specifications: {
-        height: '120 m',
-        diameter: '9 m',
-        mass: '5,000,000 kg',
-        payloadToLEO: '150,000 kg'
-      },
-      status: 'development',
-      createdAt: new Date()
-    },
-    {
-      id: uuidv4(),
-      name: 'Dragon Capsule',
-      type: 'Crew and cargo spacecraft',
-      specifications: {
-        height: '8.1 m',
-        diameter: '4 m',
-        mass: '12,200 kg',
-        payloadToLEO: '6,000 kg'
-      },
-      status: 'active',
+      email: adminEmail,
+      name: 'Admin User',
+      password: hashedPassword,
+      role: 'admin',
       createdAt: new Date()
     }
-  ]
-
-  // Sample missions
-  const missions = [
-    {
-      id: uuidv4(),
-      name: 'Artemis Moon Mission',
-      description: 'Return humans to the Moon and establish a sustainable lunar presence',
-      status: 'planned',
-      launchDate: new Date('2024-12-15'),
-      payload: 'Orion Spacecraft',
-      orbit: 'Lunar orbit',
-      customer: 'NASA',
-      createdAt: new Date()
-    },
-    {
-      id: uuidv4(),
-      name: 'Mars Sample Return',
-      description: 'Retrieve samples from Mars surface and return them to Earth',
-      status: 'success',
-      launchDate: new Date('2024-03-20'),
-      payload: 'Sample Return Vehicle',
-      orbit: 'Mars transfer orbit',
-      customer: 'ESA',
-      createdAt: new Date()
-    },
-    {
-      id: uuidv4(),
-      name: 'Starlink Constellation',
-      description: 'Deploy next-generation internet satellites',
-      status: 'success',
-      launchDate: new Date('2024-06-10'),
-      payload: '60 Starlink satellites',
-      orbit: 'Low Earth orbit',
-      customer: 'SpaceX',
-      createdAt: new Date()
-    }
-  ]
-
-  // Sample team members
-  const teams = [
-    {
-      id: uuidv4(),
-      name: 'Dr. Sarah Chen',
-      position: 'Chief Technology Officer',
-      department: 'Engineering',
-      bio: 'Leading rocket propulsion expert with 15 years of experience in aerospace engineering.',
-      experience: '15 years',
-      createdAt: new Date()
-    },
-    {
-      id: uuidv4(),
-      name: 'Marcus Rodriguez',
-      position: 'Mission Director',
-      department: 'Operations',
-      bio: 'Veteran mission commander with expertise in complex space operations.',
-      experience: '12 years',
-      createdAt: new Date()
-    },
-    {
-      id: uuidv4(),
-      name: 'Dr. Emily Watson',
-      position: 'Lead Systems Engineer',
-      department: 'Engineering',
-      bio: 'Spacecraft systems specialist focusing on reliability and safety.',
-      experience: '10 years',
-      createdAt: new Date()
-    },
-    {
-      id: uuidv4(),
-      name: 'James Thompson',
-      position: 'Flight Operations Manager',
-      department: 'Operations',
-      bio: 'Expert in launch operations and mission control systems.',
-      experience: '8 years',
-      createdAt: new Date()
-    }
-  ]
-
-  // Sample schedules
-  const schedules = [
-    {
-      id: uuidv4(),
-      missionName: 'Jupiter Probe Launch',
-      description: 'Scientific mission to study Jupiter and its moons',
-      launchDate: new Date('2025-01-15'),
-      launchTime: '14:30 UTC',
-      rocket: 'Falcon Heavy',
-      launchSite: 'Kennedy Space Center',
-      customer: 'NASA',
-      payload: 'Jupiter Probe',
-      status: 'scheduled',
-      createdAt: new Date()
-    },
-    {
-      id: uuidv4(),
-      missionName: 'Commercial Satellite Deploy',
-      description: 'Deploy commercial communication satellites',
-      launchDate: new Date('2025-02-28'),
-      launchTime: '09:15 UTC',
-      rocket: 'Starship',
-      launchSite: 'Starbase',
-      customer: 'Telecom Corp',
-      payload: 'ComSat-5',
-      status: 'scheduled',
-      createdAt: new Date()
-    },
-    {
-      id: uuidv4(),
-      missionName: 'ISS Resupply Mission',
-      description: 'Cargo resupply mission to International Space Station',
-      launchDate: new Date('2025-03-10'),
-      launchTime: '11:45 UTC',
-      rocket: 'Dragon Capsule',
-      launchSite: 'Kennedy Space Center',
-      customer: 'NASA',
-      payload: 'Cargo Dragon',
-      status: 'scheduled',
-      createdAt: new Date()
-    }
-  ]
-
-  // Insert sample data if collections are empty
-  const rocketsCollection = db.collection('rockets')
-  const rocketsCount = await rocketsCollection.countDocuments()
-  if (rocketsCount === 0) {
-    await rocketsCollection.insertMany(rockets)
+    inMemoryDB.users.push(adminUser)
+    console.log('Admin user created: admin@astrolaunch.com / admin123')
   }
+  
+  // Initialize sample data only if empty
+  if (inMemoryDB.rockets.length === 0) {
+    // Sample rockets
+    const rockets = [
+      {
+        id: uuidv4(),
+        name: 'Falcon Heavy',
+        type: 'Heavy-lift launch vehicle',
+        specifications: {
+          height: '70 m',
+          diameter: '12.2 m',
+          mass: '1,420,788 kg',
+          payloadToLEO: '63,800 kg'
+        },
+        status: 'active',
+        createdAt: new Date()
+      },
+      {
+        id: uuidv4(),
+        name: 'Starship',
+        type: 'Super heavy-lift launch vehicle',
+        specifications: {
+          height: '120 m',
+          diameter: '9 m',
+          mass: '5,000,000 kg',
+          payloadToLEO: '150,000 kg'
+        },
+        status: 'development',
+        createdAt: new Date()
+      },
+      {
+        id: uuidv4(),
+        name: 'Dragon Capsule',
+        type: 'Crew and cargo spacecraft',
+        specifications: {
+          height: '8.1 m',
+          diameter: '4 m',
+          mass: '12,200 kg',
+          payloadToLEO: '6,000 kg'
+        },
+        status: 'active',
+        createdAt: new Date()
+      }
+    ]
 
-  const missionsCollection = db.collection('missions')
-  const missionsCount = await missionsCollection.countDocuments()
-  if (missionsCount === 0) {
-    await missionsCollection.insertMany(missions)
-  }
+    // Sample missions
+    const missions = [
+      {
+        id: uuidv4(),
+        name: 'Artemis Moon Mission',
+        description: 'Return humans to the Moon and establish a sustainable lunar presence',
+        status: 'planned',
+        launchDate: new Date('2025-12-15'),
+        customer: 'NASA',
+        payload: 'Orion Spacecraft',
+        orbit: 'Lunar',
+        createdAt: new Date()
+      },
+      {
+        id: uuidv4(),
+        name: 'Mars Sample Return',
+        description: 'Retrieve samples collected by the Perseverance rover from Mars',
+        status: 'development',
+        launchDate: new Date('2025-09-20'),
+        customer: 'NASA/ESA',
+        payload: 'Mars Sample Return Orbiter',
+        orbit: 'Mars Transfer',
+        createdAt: new Date()
+      },
+      {
+        id: uuidv4(),
+        name: 'Starlink Constellation',
+        description: 'Deploy next-generation internet satellites for global coverage',
+        status: 'success',
+        launchDate: new Date('2025-01-10'),
+        customer: 'SpaceX',
+        payload: 'Starlink Satellites',
+        orbit: 'LEO',
+        createdAt: new Date()
+      }
+    ]
 
-  const teamsCollection = db.collection('teams')
-  const teamsCount = await teamsCollection.countDocuments()
-  if (teamsCount === 0) {
-    await teamsCollection.insertMany(teams)
-  }
+    // Sample team members
+    const teams = [
+      {
+        id: uuidv4(),
+        name: 'Dr. Sarah Chen',
+        position: 'Chief Technology Officer',
+        department: 'Engineering',
+        experience: '15 years',
+        bio: 'Leading expert in propulsion systems and spacecraft design.',
+        createdAt: new Date()
+      },
+      {
+        id: uuidv4(),
+        name: 'Commander Alex Rodriguez',
+        position: 'Flight Operations Director',
+        department: 'Operations',
+        experience: '20 years',
+        bio: 'Former astronaut with multiple space missions under their belt.',
+        createdAt: new Date()
+      },
+      {
+        id: uuidv4(),
+        name: 'Dr. Michael Kumar',
+        position: 'Lead Scientist',
+        department: 'Science',
+        experience: '12 years',
+        bio: 'Specialized in planetary science and mission planning.',
+        createdAt: new Date()
+      }
+    ]
 
-  const schedulesCollection = db.collection('schedules')
-  const schedulesCount = await schedulesCollection.countDocuments()
-  if (schedulesCount === 0) {
-    await schedulesCollection.insertMany(schedules)
+    // Sample schedules
+    const schedules = [
+      {
+        id: uuidv4(),
+        missionName: 'Europa Clipper Mission',
+        description: 'Orbital mission to study Jupiter\'s moon Europa',
+        launchDate: new Date('2025-08-15'),
+        launchTime: '14:30 UTC',
+        rocket: 'Falcon Heavy',
+        launchSite: 'Kennedy Space Center',
+        customer: 'NASA',
+        payload: 'Europa Clipper',
+        status: 'scheduled',
+        createdAt: new Date()
+      },
+      {
+        id: uuidv4(),
+        missionName: 'ISS Resupply Mission',
+        description: 'Cargo resupply mission to International Space Station',
+        launchDate: new Date('2025-03-10'),
+        launchTime: '11:45 UTC',
+        rocket: 'Dragon Capsule',
+        launchSite: 'Kennedy Space Center',
+        customer: 'NASA',
+        payload: 'Cargo Dragon',
+        status: 'scheduled',
+        createdAt: new Date()
+      }
+    ]
+
+    // Add sample data to in-memory storage
+    inMemoryDB.rockets = rockets
+    inMemoryDB.missions = missions
+    inMemoryDB.teams = teams
+    inMemoryDB.schedules = schedules
   }
 }
 
@@ -249,8 +222,6 @@ async function handleRoute(request, { params }) {
   const method = request.method
 
   try {
-    const db = await connectToMongo()
-    
     // Initialize sample data on first request
     await initializeSampleData()
 
@@ -270,7 +241,7 @@ async function handleRoute(request, { params }) {
         ))
       }
 
-      const existingUser = await db.collection('users').findOne({ email })
+      const existingUser = inMemoryDB.users.find(user => user.email === email)
       if (existingUser) {
         return handleCORS(NextResponse.json(
           { error: "User already exists" }, 
@@ -288,8 +259,12 @@ async function handleRoute(request, { params }) {
         createdAt: new Date()
       }
 
-      await db.collection('users').insertOne(user)
-      const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' })
+      inMemoryDB.users.push(user)
+      const token = jwt.sign({ 
+        userId: user.id, 
+        email: user.email, 
+        role: user.role 
+      }, JWT_SECRET, { expiresIn: '24h' })
       
       const { password: _, ...userWithoutPassword } = user
       return handleCORS(NextResponse.json({ user: userWithoutPassword, token }))
@@ -305,7 +280,7 @@ async function handleRoute(request, { params }) {
         ))
       }
 
-      const user = await db.collection('users').findOne({ email })
+      const user = inMemoryDB.users.find(user => user.email === email)
       if (!user || !await bcrypt.compare(password, user.password)) {
         return handleCORS(NextResponse.json(
           { error: "Invalid credentials" }, 
@@ -313,7 +288,11 @@ async function handleRoute(request, { params }) {
         ))
       }
 
-      const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' })
+      const token = jwt.sign({ 
+        userId: user.id, 
+        email: user.email, 
+        role: user.role 
+      }, JWT_SECRET, { expiresIn: '24h' })
       
       const { password: _, ...userWithoutPassword } = user
       return handleCORS(NextResponse.json({ user: userWithoutPassword, token }))
@@ -325,7 +304,7 @@ async function handleRoute(request, { params }) {
         return handleCORS(NextResponse.json({ valid: false }, { status: 401 }))
       }
 
-      const user = await db.collection('users').findOne({ id: decoded.userId })
+      const user = inMemoryDB.users.find(user => user.id === decoded.userId)
       if (!user) {
         return handleCORS(NextResponse.json({ valid: false }, { status: 401 }))
       }
@@ -336,19 +315,20 @@ async function handleRoute(request, { params }) {
 
     // ROCKETS ROUTES
     if (route === '/rockets' && method === 'GET') {
-      const rockets = await db.collection('rockets')
-        .find({})
-        .sort({ createdAt: -1 })
-        .toArray()
-      
-      const cleanedRockets = rockets.map(({ _id, ...rest }) => rest)
-      return handleCORS(NextResponse.json(cleanedRockets))
+      const rockets = inMemoryDB.rockets.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      return handleCORS(NextResponse.json(rockets))
     }
 
     if (route === '/rockets' && method === 'POST') {
       const decoded = verifyToken(request)
       if (!decoded) {
         return handleCORS(NextResponse.json({ error: "Unauthorized" }, { status: 401 }))
+      }
+
+      // Check if user has admin role
+      const user = inMemoryDB.users.find(user => user.id === decoded.userId)
+      if (!user || user.role !== 'admin') {
+        return handleCORS(NextResponse.json({ error: "Admin privileges required" }, { status: 403 }))
       }
 
       const rocketData = await request.json()
@@ -358,26 +338,26 @@ async function handleRoute(request, { params }) {
         createdAt: new Date()
       }
 
-      await db.collection('rockets').insertOne(rocket)
-      const { _id, ...cleanedRocket } = rocket
-      return handleCORS(NextResponse.json(cleanedRocket, { status: 201 }))
+      inMemoryDB.rockets.push(rocket)
+      return handleCORS(NextResponse.json(rocket, { status: 201 }))
     }
 
     // MISSIONS ROUTES
     if (route === '/missions' && method === 'GET') {
-      const missions = await db.collection('missions')
-        .find({})
-        .sort({ createdAt: -1 })
-        .toArray()
-      
-      const cleanedMissions = missions.map(({ _id, ...rest }) => rest)
-      return handleCORS(NextResponse.json(cleanedMissions))
+      const missions = inMemoryDB.missions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      return handleCORS(NextResponse.json(missions))
     }
 
     if (route === '/missions' && method === 'POST') {
       const decoded = verifyToken(request)
       if (!decoded) {
         return handleCORS(NextResponse.json({ error: "Unauthorized" }, { status: 401 }))
+      }
+
+      // Check if user has admin role
+      const user = inMemoryDB.users.find(user => user.id === decoded.userId)
+      if (!user || user.role !== 'admin') {
+        return handleCORS(NextResponse.json({ error: "Admin privileges required" }, { status: 403 }))
       }
 
       const missionData = await request.json()
@@ -387,26 +367,26 @@ async function handleRoute(request, { params }) {
         createdAt: new Date()
       }
 
-      await db.collection('missions').insertOne(mission)
-      const { _id, ...cleanedMission } = mission
-      return handleCORS(NextResponse.json(cleanedMission, { status: 201 }))
+      inMemoryDB.missions.push(mission)
+      return handleCORS(NextResponse.json(mission, { status: 201 }))
     }
 
     // TEAMS ROUTES
     if (route === '/teams' && method === 'GET') {
-      const teams = await db.collection('teams')
-        .find({})
-        .sort({ createdAt: -1 })
-        .toArray()
-      
-      const cleanedTeams = teams.map(({ _id, ...rest }) => rest)
-      return handleCORS(NextResponse.json(cleanedTeams))
+      const teams = inMemoryDB.teams.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      return handleCORS(NextResponse.json(teams))
     }
 
     if (route === '/teams' && method === 'POST') {
       const decoded = verifyToken(request)
       if (!decoded) {
         return handleCORS(NextResponse.json({ error: "Unauthorized" }, { status: 401 }))
+      }
+
+      // Check if user has admin role
+      const user = inMemoryDB.users.find(user => user.id === decoded.userId)
+      if (!user || user.role !== 'admin') {
+        return handleCORS(NextResponse.json({ error: "Admin privileges required" }, { status: 403 }))
       }
 
       const teamData = await request.json()
@@ -416,26 +396,26 @@ async function handleRoute(request, { params }) {
         createdAt: new Date()
       }
 
-      await db.collection('teams').insertOne(teamMember)
-      const { _id, ...cleanedTeamMember } = teamMember
-      return handleCORS(NextResponse.json(cleanedTeamMember, { status: 201 }))
+      inMemoryDB.teams.push(teamMember)
+      return handleCORS(NextResponse.json(teamMember, { status: 201 }))
     }
 
     // SCHEDULES ROUTES
     if (route === '/schedules' && method === 'GET') {
-      const schedules = await db.collection('schedules')
-        .find({})
-        .sort({ launchDate: 1 })
-        .toArray()
-      
-      const cleanedSchedules = schedules.map(({ _id, ...rest }) => rest)
-      return handleCORS(NextResponse.json(cleanedSchedules))
+      const schedules = inMemoryDB.schedules.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      return handleCORS(NextResponse.json(schedules))
     }
 
     if (route === '/schedules' && method === 'POST') {
       const decoded = verifyToken(request)
       if (!decoded) {
         return handleCORS(NextResponse.json({ error: "Unauthorized" }, { status: 401 }))
+      }
+
+      // Check if user has admin role
+      const user = inMemoryDB.users.find(user => user.id === decoded.userId)
+      if (!user || user.role !== 'admin') {
+        return handleCORS(NextResponse.json({ error: "Admin privileges required" }, { status: 403 }))
       }
 
       const scheduleData = await request.json()
@@ -445,9 +425,8 @@ async function handleRoute(request, { params }) {
         createdAt: new Date()
       }
 
-      await db.collection('schedules').insertOne(schedule)
-      const { _id, ...cleanedSchedule } = schedule
-      return handleCORS(NextResponse.json(cleanedSchedule, { status: 201 }))
+      inMemoryDB.schedules.push(schedule)
+      return handleCORS(NextResponse.json(schedule, { status: 201 }))
     }
 
     // Route not found
