@@ -371,7 +371,7 @@ export default function App() {
                         <Canvas camera={{ position: [0, 0, 10], fov: 60 }}>
                           <Suspense fallback={null}>
                             <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} />
-                            <Environment preset="space" />
+                            <Environment preset="night" />
                             <ambientLight intensity={0.3} />
                             <directionalLight position={[10, 10, 5]} intensity={1} />
                             <RocketModel scale={[0.5, 0.5, 0.5]} />
