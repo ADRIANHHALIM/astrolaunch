@@ -58,7 +58,8 @@ class BackendTester:
             
             return response
         except requests.exceptions.RequestException as e:
-            return None, str(e)
+            print(f"Request error for {method} {url}: {str(e)}")
+            return None
     
     def test_basic_api(self):
         """Test GET /api/ endpoint"""
